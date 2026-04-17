@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Architecture of Doubt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #1a1c27;
+  --bg2:     #21253a;
+  --surface: #2a2f4a;
+  --border:  rgba(255,255,255,0.10);
+  --accent:  #7ba7ff;
+  --accent2: #c07fff;
+  --glow:    rgba(123,167,255,0.15);
+  --text:    #e8eaf2;
+  --muted:   #9aa0bc;
+  --danger:  #ff7080;
+  --mono:    'DM Mono', monospace;
+  --serif:   'Libre Baskerville', serif;
+  --sans:    'Syne', sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--serif);
+  font-size:18px;
+  line-height:1.75;
+  overflow-x:hidden;
+}
+::selection{background:var(--accent);color:#fff}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--accent);border-radius:2px}
+
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  opacity:0.015;
+  pointer-events:none;z-index:9999;
+}
+
+.container{max-width:900px;margin:0 auto;padding:0 2rem}
+.label{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.2em;
+  text-transform:uppercase;color:var(--accent);
+  display:inline-block;margin-bottom:1rem;
+}
+.section-title{
+  font-family:var(--sans);font-size:clamp(2rem,5vw,3.2rem);
+  font-weight:800;line-height:1.1;margin-bottom:2rem;
+  color:#fff;
+}
+.fade-in{opacity:0;transform:translateY(30px);transition:opacity 0.8s ease,transform 0.8s ease}
+.fade-in.visible{opacity:1;transform:translateY(0)}
+hr.rule{border:none;border-top:1px solid var(--border);margin:5rem 0}
+.body-text{
+  font-family:var(--serif);font-size:1rem;
+  color:var(--text);line-height:1.85;margin-bottom:1.25rem;
+}
+cite{font-family:var(--mono);font-size:12px;color:var(--accent);cursor:help}
+
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  padding:1.25rem 2rem;display:flex;justify-content:space-between;align-items:center;
+  background:linear-gradient(to bottom,rgba(26,28,39,0.97),transparent);
+  backdrop-filter:blur(8px);
+}
+.nav-logo{font-family:var(--mono);font-size:12px;letter-spacing:0.15em;color:var(--muted);text-decoration:none}
+.nav-links{display:flex;gap:2rem;list-style:none}
+.nav-links a{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.15em;
+  text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;
+}
+.nav-links a:hover{color:var(--accent)}
+@media(max-width:640px){.nav-links{display:none}}
+
+#hero{
+  min-height:100vh;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;text-align:center;
+  position:relative;overflow:hidden;padding:6rem 2rem 4rem;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(123,167,255,0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 50% at 80% 20%, rgba(192,127,255,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 20% 70%, rgba(123,167,255,0.05) 0%, transparent 60%);
+  z-index:0;
+}
+.hero-bg::after{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    to bottom, transparent, transparent 4px,
+    rgba(0,0,0,0.04) 4px, rgba(0,0,0,0.04) 5px
+  );
+  pointer-events:none;
+}
+#particles-canvas{position:absolute;inset:0;z-index:0}
+.hero-content{position:relative;z-index:1;max-width:780px}
+
+.hero-eyebrow{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.3em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:2rem;
+  opacity:0;animation:fadeUp 1s ease 0.3s forwards;
+}
+.hero-title{
+  font-family:var(--sans);font-size:clamp(3rem,10vw,6.5rem);
+  font-weight:800;line-height:0.95;letter-spacing:-0.02em;
+  margin-bottom:2rem;opacity:0;animation:fadeUp 1s ease 0.6s forwards;
+  color:#fff;
+}
+.hero-title .line-accent{color:var(--accent);display:block}
+.hero-title .line-ghost{
+  color:transparent;
+  -webkit-text-stroke:1px rgba(255,255,255,0.25);
+  display:block;
+}
+.hero-thesis-block{
+  opacity:0;animation:fadeUp 1s ease 0.9s forwards;
+  max-width:620px;margin:0 auto 3rem;
+}
+.hero-question{
+  font-family:var(--serif);font-size:clamp(1rem,2.5vw,1.15rem);
+  color:var(--muted);font-style:italic;line-height:1.7;margin-bottom:1.75rem;
+}
+.thesis-card{
+  background:rgba(123,167,255,0.08);
+  border:1px solid rgba(123,167,255,0.25);
+  border-radius:6px;padding:1.25rem 1.75rem;text-align:left;
+}
+.thesis-card-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:0.25em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:0.6rem;display:block;
+}
+.thesis-card p{font-family:var(--serif);font-size:0.95rem;color:var(--text);line-height:1.75}
+
+.scroll-indicator{
+  position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  opacity:0;animation:fadeIn 1s ease 1.5s forwards;cursor:pointer;
+}
+.scroll-indicator span{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;color:var(--muted)}
+.scroll-line{
+  width:1px;height:40px;
+  background:linear-gradient(to bottom,var(--accent),transparent);
+  animation:scrollPulse 2s ease infinite;
+}
+@keyframes scrollPulse{0%,100%{opacity:0.3;transform:scaleY(1)}50%{opacity:1;transform:scaleY(1.1)}}
+
+.glitch{position:relative;animation:glitchShift 6s infinite}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;opacity:0}
+.glitch::before{color:var(--accent);clip-path:polygon(0 15%,100% 15%,100% 35%,0 35%);animation:glitchA 6s infinite}
+.glitch::after{color:var(--accent2);clip-path:polygon(0 60%,100% 60%,100% 80%,0 80%);animation:glitchB 6s infinite}
+@keyframes glitchShift{0%,90%,100%{transform:none}91%{transform:translateX(-2px)}93%{transform:translateX(2px)}95%{transform:translateX(-1px)}}
+@keyframes glitchA{0%,89%,100%{opacity:0;transform:none}90%{opacity:0.6;transform:translateX(3px) skewX(-2deg)}92%{opacity:0}}
+@keyframes glitchB{0%,92%,100%{opacity:0;transform:none}93%{opacity:0.5;transform:translateX(-3px) skewX(1deg)}95%{opacity:0}}
+
+section{padding:7rem 0}
+#personal{background:var(--bg2)}
+
+.personal-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start}
+.personal-image-box{
+  aspect-ratio:4/5;background:var(--surface);
+  border:1px solid var(--border);border-radius:6px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1rem;position:relative;overflow:hidden;
+}
+.personal-image-box::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(123,167,255,0.06),rgba(192,127,255,0.06));
+}
+.img-placeholder-icon{width:48px;height:48px;border:1px solid rgba(255,255,255,0.12);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.img-placeholder-icon svg{opacity:0.35}
+.img-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;letter-spacing:0.1em}
+@media(max-width:700px){.personal-grid{grid-template-columns:1fr}}
+
+.source-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-left:2px solid var(--accent);border-radius:6px;
+  padding:1.25rem 1.5rem;margin:1.5rem 0;
+  transition:border-color 0.3s,background 0.3s;
+}
+.source-card:hover{border-left-color:var(--accent2);background:rgba(123,167,255,0.05)}
+.source-label{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:0.5rem}
+
+.sources-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem}
+@media(max-width:600px){.sources-grid{grid-template-columns:1fr}}
+
+#claims{background:var(--bg)}
+.claims-grid{display:grid;grid-template-columns:1fr;gap:2px}
+.claim-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:3rem;position:relative;overflow:hidden;
+  transition:border-color 0.3s,transform 0.3s;cursor:default;
+}
+.claim-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(to right,var(--accent),var(--accent2));
+  transform:scaleX(0);transform-origin:left;transition:transform 0.5s ease;
+}
+.claim-card:hover{border-color:rgba(255,255,255,0.18);transform:translateY(-2px)}
+.claim-card:hover::before{transform:scaleX(1)}
+.claim-number{
+  font-family:var(--mono);font-size:60px;font-weight:300;
+  color:rgba(255,255,255,0.05);
+  position:absolute;top:1rem;right:2rem;line-height:1;
+  pointer-events:none;user-select:none;
+}
+.claim-title{font-family:var(--sans);font-size:1.5rem;font-weight:700;margin-bottom:1.5rem;color:#fff}
+.evidence-block{
+  background:rgba(0,0,0,0.2);border:1px solid var(--border);
+  border-radius:4px;padding:1rem 1.25rem;margin-top:1rem;
+}
+.evidence-label{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;color:var(--accent2);text-transform:uppercase;margin-bottom:0.5rem}
+.evidence-text{font-size:0.9rem;color:var(--text);line-height:1.7}
+.explanation-text{font-size:0.9rem;color:var(--muted);line-height:1.7;margin-top:0.75rem;font-style:italic}
+
+#counterclaims{background:var(--bg2)}
+#refutations{background:var(--bg)}
+.accordion-item{
+  border:1px solid var(--border);border-radius:6px;
+  margin-bottom:1rem;overflow:hidden;transition:border-color 0.3s;
+}
+.accordion-item:hover{border-color:rgba(255,255,255,0.18)}
+.accordion-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:1.5rem 2rem;cursor:pointer;
+  background:var(--surface);transition:background 0.2s;gap:1rem;
+}
+.accordion-header:hover{background:rgba(255,255,255,0.04)}
+.accordion-header-text{font-family:var(--sans);font-size:1rem;font-weight:700;flex:1;color:#fff}
+.accordion-icon{
+  width:24px;height:24px;border:1px solid var(--border);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:transform 0.3s,border-color 0.3s;
+  color:var(--accent);font-size:14px;font-weight:300;
+}
+.accordion-item.open .accordion-icon{transform:rotate(45deg);border-color:var(--accent)}
+.accordion-body{
+  max-height:0;overflow:hidden;
+  transition:max-height 0.5s cubic-bezier(0.4,0,0.2,1);
+  background:var(--bg);padding:0 2rem;
+}
+.accordion-body-inner{padding:1.5rem 0 2rem}
+.accordion-item.open .accordion-body{max-height:600px}
+
+.refutation-pair{
+  display:grid;grid-template-columns:1fr 1px 1fr;
+  gap:2rem;margin-bottom:2rem;align-items:start;
+}
+.refutation-divider{background:var(--border);align-self:stretch}
+.refutation-side-label{
+  font-family:var(--mono);font-size:10px;letter-spacing:0.2em;
+  text-transform:uppercase;margin-bottom:1rem;
+}
+.refutation-side-label.counter{color:var(--danger)}
+.refutation-side-label.refute{color:#4cde89}
+.refutation-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem}
+@media(max-width:640px){.refutation-pair{grid-template-columns:1fr}.refutation-divider{display:none}}
+
+#multimedia{background:var(--bg2)}
+.media-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1.25rem;
+}
+.media-item-video{
+  grid-column:span 2;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+  transition:border-color 0.3s;
+}
+.media-item-video:hover{border-color:var(--accent)}
+.media-item-video .media-label-bar{
+  padding:0.75rem 1.25rem;
+  display:flex;align-items:center;gap:0.75rem;
+  border-bottom:1px solid var(--border);
+}
+.media-item-video .media-label-bar span{
+  font-family:var(--mono);font-size:10px;letter-spacing:0.2em;
+  text-transform:uppercase;color:var(--accent);
+}
+.video-ratio{
+  position:relative;width:100%;padding-bottom:56.25%;background:#000;
+}
+.video-ratio iframe{
+  position:absolute;inset:0;width:100%;height:100%;border:none;
+}
+
+.media-item-img{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+  transition:border-color 0.3s,transform 0.3s;
+  display:flex;flex-direction:column;
+}
+.media-item-img:hover{border-color:var(--accent);transform:translateY(-3px)}
+.media-item-img .media-label-bar{
+  padding:0.75rem 1.25rem;
+  display:flex;align-items:center;gap:0.75rem;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.media-item-img .media-label-bar span{
+  font-family:var(--mono);font-size:10px;letter-spacing:0.2em;
+  text-transform:uppercase;color:var(--accent);
+}
+.media-item-img img{
+  width:100%;height:260px;object-fit:cover;display:block;
+  transition:transform 0.4s ease;
+}
+.media-item-img:hover img{transform:scale(1.03)}
+.media-item-img .media-caption{
+  padding:0.75rem 1.25rem;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  line-height:1.5;border-top:1px solid var(--border);
+}
+
+@media(max-width:640px){
+  .media-grid{grid-template-columns:1fr}
+  .media-item-video{grid-column:span 1}
+}
+
+#social{background:var(--bg)}
+.flow-diagram{display:flex;flex-direction:column;align-items:center;gap:0;margin:3rem 0}
+.flow-node{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:1.25rem 2rem;text-align:center;width:100%;max-width:420px;
+  transition:border-color 0.3s;
+}
+.flow-node:hover{border-color:var(--accent)}
+.flow-node-label{font-family:var(--sans);font-size:0.95rem;font-weight:700;color:#fff;margin-bottom:0.25rem}
+.flow-node-sub{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.flow-arrow{width:1px;height:40px;background:linear-gradient(to bottom,var(--accent),transparent);position:relative}
+.flow-arrow::after{
+  content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  border-left:5px solid transparent;border-right:5px solid transparent;
+  border-top:7px solid var(--accent);
+}
+.flow-fork{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;width:100%;max-width:700px}
+.flow-fork-node{
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  padding:1rem;text-align:center;transition:border-color 0.3s;
+}
+.flow-fork-node:hover{border-color:var(--accent2)}
+.fork-icon{font-size:1.5rem;margin-bottom:0.5rem}
+.fork-label{font-family:var(--sans);font-size:0.85rem;font-weight:700;color:#fff}
+.fork-sub{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:0.25rem}
+
+#conclusion{background:var(--bg2)}
+.conclusion-split{display:grid;grid-template-columns:1fr 1fr;gap:4rem}
+.future-list{list-style:none;margin-top:1rem}
+.future-list li{
+  padding:0.75rem 0;border-bottom:1px solid var(--border);
+  font-size:0.95rem;display:flex;align-items:flex-start;gap:0.75rem;color:var(--muted);
+}
+.future-list li::before{content:'?';color:var(--accent);font-family:var(--mono);font-size:12px;flex-shrink:0;margin-top:3px}
+@media(max-width:700px){.conclusion-split{grid-template-columns:1fr}}
+
+#works-cited{background:var(--bg);padding-bottom:8rem}
+.works-cited-list{list-style:none;counter-reset:citation}
+.works-cited-list li{
+  counter-increment:citation;padding:1.5rem 0 1.5rem 4rem;
+  border-bottom:1px solid var(--border);font-size:0.95rem;line-height:1.7;
+  position:relative;font-family:var(--serif);transition:background 0.2s;
+}
+.works-cited-list li:hover{background:rgba(255,255,255,0.015)}
+.works-cited-list li::before{
+  content:counter(citation,decimal-leading-zero);
+  position:absolute;left:0;top:1.5rem;
+  font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:0.1em;
+}
+.citation-meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:0.25rem}
+
+footer{
+  background:var(--bg);border-top:1px solid var(--border);
+  padding:2rem;display:flex;justify-content:space-between;
+  align-items:center;flex-wrap:wrap;gap:1rem;
+}
+footer p{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.1em}
+
+.progress-bar{
+  position:fixed;top:0;left:0;height:2px;
+  background:linear-gradient(to right,var(--accent),var(--accent2));
+  z-index:200;transition:width 0.1s linear;
+}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress"></div>
+
+<nav>
+  <a class="nav-logo" href="#">THE ARCHITECTURE OF DOUBT</a>
+  <ul class="nav-links">
+    <li><a href="#personal">Context</a></li>
+    <li><a href="#claims">Claims</a></li>
+    <li><a href="#counterclaims">Counter</a></li>
+    <li><a href="#multimedia">Media</a></li>
+    <li><a href="#works-cited">Sources</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-bg"></div>
+  <canvas id="particles-canvas"></canvas>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Project-4 · College Writing · 2026</p>
+    <h1 class="hero-title">
+      <span class="glitch" data-text="The Architecture">The Architecture</span>
+      <span class="line-accent">of Doubt</span>
+      <span class="line-ghost">Conspiracy</span>
+    </h1>
+    <div class="hero-thesis-block">
+      <p class="hero-question">How are conspiracy theories constructed, and how do they challenge modern society?</p>
+      <div class="thesis-card">
+        <span class="thesis-card-label">Thesis</span>
+        <p>Conspiracy theories are constructed by exploiting fear and bias and are spread through social media which allows misinformation to influence society.</p>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-indicator" onclick="document.getElementById('personal').scrollIntoView({behavior:'smooth'})">
+    <span>scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- PERSONAL CONNECTION -->
+<section id="personal">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">02 — Personal Connection</span>
+      <h2 class="section-title">Why This Topic Matters</h2>
+    </div>
+    <div class="personal-grid">
+      <div class="fade-in" style="transition-delay:0.1s">
+        <p class="body-text">As more and more users are being exposed to conspiracy theories on social media and other forms of mass media, I have been motivated to further investigate how this type of exposure and engagement can shape people's beliefs. This has led me to raise concerns about the increasing amount of conspiracy content being created via social media, a lot of which presents untrue or misleading information to users on multiple platforms. This in return creates extreme disparities in our society, due to the disengagement between some users and others that oppose their beliefs.</p>
+        <p class="body-text">This challenge makes me wonder how these types of conspiracy theories originated and why they are believed with such fervor by many people online. What fascinates me amidst all of this is the idea of knowing that various realities exist beneath the surface — and this fascination has evolved into a desire to uncover those realities as I become more aware of the fact that the world is not what it appears to be, and that most things are not as simple or perfect as they let us think, particularly with social and political issues. I want to explore the truth and compare it against what is exaggerated and against falsehoods.</p>
+        <p class="body-text" style="margin-bottom:0">What I find the most interesting about this subject is the way in which information can sway and influence anyone, including myself. The fact that we are unable to discern what is actually true and what is actually false is something that I'm unable to fathom. This topic becomes a matter of social concern because misinformation on social media can shape civic attitudes and undermine evidence-based decision making — and how misinformation can affect the way in which we function as a democracy.</p>
+      </div>
+      <div class="fade-in" style="transition-delay:0.2s">
+        <div class="personal-image-box">
+  <img src="https://brewminate.com/wp-content/uploads/2025/09/091825-02-History-Science.jpg"
+       alt="History of science and conspiracy thinking"
+       style="width:100%; height:100%; object-fit:cover; border-radius:12px;">
+  <p class="img-label">Historical roots of pseudoscience and conspiracy thinking</p>
+  <p class="img-label" style="font-size:10px;margin-top:0.5rem;padding:0 1.5rem">
+    Source: Brewminate
+  </p>
+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTEXT / BACKGROUND -->
+<section id="context">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">03 — Background</span>
+      <h2 class="section-title">Understanding the Topic</h2>
+    </div>
+    <div class="fade-in" style="transition-delay:0.1s">
+      <p class="body-text">Political conspiracy theories have been around for quite some time, but the manner in which they have spread has evolved. In the past, people were influenced by what they listened to on the radio, what they read in the newspaper, and what they watched on television. Political elites influenced the general public through these mediums. However, today social media has revolutionized the manner in which these theories are spread. Political influencers can now easily reach millions of young people on these platforms, making them get influenced easily. As seen in Penn State's research, social media environments reward emotionally charged content, which makes conspiracy narratives especially likely to spread (Čejková 2). This has led to politics becoming a part of the internet culture. Research has also shown that education and political knowledge do not necessarily shield people from being influenced by conspiracy theories, but rather, are based on psychological factors. New research suggests that events happening worldwide are nurturing underlying emotions that make people more willing to believe in conspiracies. Experiments have revealed that feelings of anxiety make people think more conspiratorially (Moyer 4). More importantly, higher education is also not an indication of someone's lack of faith in conspiracies. Miller, Saunders, and Farhart found that politically knowledgeable conservatives were more likely to endorse conspiracy theories that aligned with their worldview, especially when they had low trust in others (Miller, Saunders, and Farhart 7). This has implications in the modern world because young people today are growing up in a world in which social media is very prevalent and significant. Therefore, understanding how this came to be would provide insights on how misinformation spreads easily in modern times.</p>
+    </div>
+    <div class="fade-in" style="transition-delay:0.2s">
+      <div class="sources-grid">
+        <div class="source-card">
+          <p class="source-label">Source 01 — Visual Evidence</p>
+          <img src="https://static.scientificamerican.com/sciam/cache/file/A87A3CF6-4065-400D-A813F3A12EC10B6A_source.jpg?w=1350"
+               alt="Diagram showing spread of misinformation"
+               style="width:100%;border-radius:4px;margin-bottom:0.75rem;">
+          <p class="body-text" style="font-size:0.9rem;margin:0">
+            This visual demonstrates how misinformation spreads through networks and reinforces belief systems.
+          </p>
+        </div>
+        <div class="source-card">
+          <p class="source-label">Source 02 — Visual Evidence</p>
+          <img src="https://newsliteracy.psu.edu/assets/uploads/news/_1280xAUTO_fit_center-center_80_none/Conspiracy-Theories-Social-Media.jpg"
+               alt="Social media and conspiracy theory spread diagram"
+               style="width:100%;border-radius:4px;margin-bottom:0.75rem;">
+          <p class="body-text" style="font-size:0.9rem;margin:0">
+            This image shows how social media platforms amplify conspiracy theories through emotional engagement.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule" style="margin:0">
+
+<!-- CLAIMS -->
+<section id="claims">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">04 — Main Arguments</span>
+      <h2 class="section-title">Three Central Claims</h2>
+    </div>
+    <div class="claims-grid">
+
+      <div class="claim-card fade-in" style="transition-delay:0.1s">
+        <span class="claim-number">01</span>
+        <span class="label">Claim 1</span>
+        <h3 class="claim-title">Institutional Distrust Fuels Conspiracy Beliefs</h3>
+        <p class="body-text" style="font-size:0.95rem">
+          Conspiracy theories develop because people already distrust powerful institutions like governments and corporations. When people feel that those in power are hiding the truth, they become willing to hear from various alternative narratives, even from those that lack credible evidence. This pre-existing skepticism creates ground for misinformation to take root and spread.
+        </p>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence</p>
+          <p class="evidence-text">People who already have conspiratorial thinking patterns are significantly more likely to believe in media bias conspiracies. <cite>(Jolley et al. 466)</cite></p>
+          <p class="explanation-text">This shows that conspiracy theories build on existing distrust rather than just new information. When people already believe institutions are dishonest, they are more likely to accept misleading claims.</p>
+        </div>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence</p>
+          <p class="evidence-text">Partisan attachment has long been known to drive opinions… and is tied to resistance or acceptance of political narratives. <cite>(Uscinski et al. 471)</cite></p>
+        </div>
+      </div>
+
+      <div class="claim-card fade-in" style="transition-delay:0.2s">
+        <span class="claim-number">02</span>
+        <span class="label">Claim 2</span>
+        <h3 class="claim-title">Mixing Truth with Misinformation Makes Conspiracies Believable</h3>
+        <p class="body-text" style="font-size:0.95rem">
+          Conspiracy theories are constructed by combining real facts with misleading or unrelated information to appear authentic. This technique makes it difficult for ordinary people to distinguish fact from fiction.
+        </p>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence</p>
+          <p class="evidence-text">The ID2020 conspiracy used real events like the Event 201 pandemic simulation and Microsoft patents to suggest a secret global plan. <cite>(Thomas 3)</cite></p>
+          <p class="explanation-text">Because real events are included, the conspiracy appears legitimate, even though the connections made are misleading.</p>
+        </div>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence</p>
+          <p class="evidence-text">"Conspiracy beliefs depend not only on exposure to information suggesting a conspiracy but also on predispositions" (Uscinski et al., 2016).</p>
+        </div>
+      </div>
+
+      <div class="claim-card fade-in" style="transition-delay:0.3s">
+        <span class="claim-number">03</span>
+        <span class="label">Claim 3</span>
+        <h3 class="claim-title">Social Media Accelerates the Spread of Conspiracy Theories</h3>
+        <p class="body-text" style="font-size:0.95rem">
+          Social media platforms help conspiracy theories spread rapidly to large audiences. Recommendation algorithms prioritize content that generates strong emotional reactions, and conspiracy theories based content, by default, install fear, anger, and outrage. This means misinformation often travels faster than accurate information.
+        </p>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence 1</p>
+          <p class="evidence-text">A small number of highly active accounts were able to influence algorithms and spread ID2020 conspiracies widely. <cite>(Thomas 13)</cite></p>
+          <p class="explanation-text">Algorithms prioritize engaging content, so sensational conspiracy theories spread faster than accurate information.</p>
+        </div>
+        <div class="evidence-block">
+          <p class="evidence-label">Evidence 2</p>
+          <p class="evidence-text">With all of the discussion of conspiracy theories in the news media … and advocacy for conspiracy theories on the Internet <cite>(Uscinski et al., 2016, p. 2)</cite></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- COUNTERCLAIMS -->
+<section id="counterclaims">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">05 — Counterclaims</span>
+      <h2 class="section-title">Opposing Perspectives</h2>
+      <p style="color:var(--muted);max-width:600px;margin-bottom:3rem;font-style:italic">Click each item to expand the counterclaim and supporting evidence.</p>
+    </div>
+
+    <div class="accordion-item fade-in" style="transition-delay:0.1s">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <span class="accordion-header-text">Conspiracy theories do not have a large impact because many individuals do not believe them</span>
+        <span class="accordion-icon">+</span>
+      </div>
+      <div class="accordion-body">
+        <div class="accordion-body-inner">
+          <p class="body-text" style="font-size:0.95rem">Some people argue that conspiracy theories don't always have a large impact because many people often don't believe them and end up rejecting them. This suggests that the concern over conspiracy theories may be unnecessary.</p>
+          <div class="evidence-block" style="margin-top:1rem">
+            <p class="evidence-label" style="color:var(--danger)">Evidence for Counterclaim</p>
+            <p class="evidence-text">Many individuals without strong conspiratorial predispositions tend to reject conspiracy claims. <cite>(Uscinski et al. 471)</cite></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item fade-in" style="transition-delay:0.2s">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <span class="accordion-header-text">Conspiracy theories are caused primarily by psychological traits like paranoia, not social media</span>
+        <span class="accordion-icon">+</span>
+      </div>
+      <div class="accordion-body">
+        <div class="accordion-body-inner">
+          <p class="body-text" style="font-size:0.95rem">Some researchers argue that belief in conspiracy theories is constructed in individual psychological characteristics like anxiety, paranoia, or a need for cognitive closure. Moving forward with this view, targeting social media platforms would do little to reduce conspiracy belief because the underlying cause is rather psychological.</p>
+          <div class="evidence-block" style="margin-top:1rem">
+            <p class="evidence-label" style="color:var(--danger)">Evidence for Counterclaim</p>
+            <p class="evidence-text">A large body of research in psychology suggests that conspiracy beliefs are driven by anxiety, paranoia, and feelings of powerlessness (e.g., Grzesiak-Feldman 2013) <cite>(Uscinski et al. 67).</cite></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="accordion-item fade-in" style="transition-delay:0.3s">
+      <div class="accordion-header" onclick="toggleAccordion(this)">
+        <span class="accordion-header-text">Platforms can eliminate conspiracy theories by removing harmful content</span>
+        <span class="accordion-icon">+</span>
+      </div>
+      <div class="accordion-body">
+        <div class="accordion-body-inner">
+          <p class="body-text" style="font-size:0.95rem">Some believe that social media companies already have the tools and willingness to address misinformation effectively. Platforms like YouTube, Facebook, and Twitter have implemented content moderation policies, fact-checking labels, and removal of posts that violate community guidelines. According to this argument, moderation efforts are sufficient to contain the spread of conspiracy theories.</p>
+          <div class="evidence-block" style="margin-top:1rem">
+            <p class="evidence-label" style="color:var(--danger)">Evidence for Counterclaim</p>
+            <p class="evidence-text">Platforms have attempted to moderate misinformation and remove harmful posts. <cite>(Thomas 13)</cite></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- REFUTATIONS -->
+<section id="refutations">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">06 — Refutations</span>
+      <h2 class="section-title">Responding to Opposition</h2>
+    </div>
+
+    <div class="refutation-pair fade-in" style="transition-delay:0.1s">
+      <div>
+        <p class="refutation-side-label counter">Counterclaim 1</p>
+        <div class="refutation-box">
+          <p style="font-size:0.9rem;color:var(--muted);line-height:1.7">Many individuals without conspiratorial predispositions reject conspiracy claims, suggesting their societal impact is limited.</p>
+        </div>
+      </div>
+      <div class="refutation-divider"></div>
+      <div>
+        <p class="refutation-side-label refute">Refutation 1</p>
+        <div class="refutation-box" style="border-color:rgba(76,222,137,0.3)">
+          <p style="font-size:0.9rem;color:var(--text);line-height:1.7">Even if many individuals reject conspiracy theories, those who already don't trust institutions are more likely to believe and spread them. The harm lies in the targeted reach these theories have among vulnerable populations which is often enough to influence political and social issues.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="refutation-pair fade-in" style="transition-delay:0.2s">
+      <div>
+        <p class="refutation-side-label counter">Counterclaim 2</p>
+        <div class="refutation-box">
+          <p style="font-size:0.9rem;color:var(--muted);line-height:1.7">Conspiracy belief is primarily a product of psychological traits like paranoia, making social media interventions ineffective.</p>
+        </div>
+      </div>
+      <div class="refutation-divider"></div>
+      <div>
+        <p class="refutation-side-label refute">Refutation 2</p>
+        <div class="refutation-box" style="border-color:rgba(76,222,137,0.3)">
+          <p style="font-size:0.9rem;color:var(--text);line-height:1.7">The missing aspect in this paragraph is the role played by one's social and political environment in determining their beliefs. Research indicates that political cues and contextual factors greatly influence individuals' belief in conspiracy theories <cite>(Jolley et al. 472)</cite>, therefore indicating that one's belief is not only an individual characteristic.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="refutation-pair fade-in" style="transition-delay:0.3s">
+      <div>
+        <p class="refutation-side-label counter">Counterclaim 3</p>
+        <div class="refutation-box">
+          <p style="font-size:0.9rem;color:var(--muted);line-height:1.7">Social media platforms can eliminate conspiracy theories through content moderation and post removal.</p>
+        </div>
+      </div>
+      <div class="refutation-divider"></div>
+      <div>
+        <p class="refutation-side-label refute">Refutation 3</p>
+        <div class="refutation-box" style="border-color:rgba(76,222,137,0.3)">
+          <p style="font-size:0.9rem;color:var(--text);line-height:1.7">With even moderation, the algorithm is set up to maximize engagement, which conspiracy theories are often good at achieving. "A small number of very active users were able to exploit the recommendations system to promote the ID2020 conspiracy theory" <cite>(Thomas 13)</cite>. This illustrates that moderation cannot overcome the intrinsic motivations embedded within the system design.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- MULTIMEDIA -->
+<section id="multimedia">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">07 — Multimedia</span>
+      <h2 class="section-title">Visual Evidence &amp; Resources</h2>
+    </div>
+
+    <div class="media-grid fade-in" style="transition-delay:0.1s">
+
+      <!-- VIDEO — updated embed -->
+      <div class="media-item-video">
+        <div class="media-label-bar">
+          <span>▶ Video</span>
+        </div>
+        <div class="video-ratio">
+          <iframe
+            src="https://www.youtube.com/embed/uIC2DbZWr0Y"
+            title="Conspiracy Theory Video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </div>
+
+      <!-- PHOTO placeholder -->
+      <div class="media-item-img">
+        <div class="media-label-bar">
+          <span>📷 Photo</span>
+        </div>
+        <img src="https://substackcdn.com/image/fetch/$s_!eQki!,w_1456,c_limit,f_webp,q_auto:good,fl_progressive:steep/https%3A%2F%2Fsubstack-post-media.s3.amazonaws.com%2Fpublic%2Fimages%2F2b3f68dc-d6d5-49b7-be8c-9ec1ca0ea7a6_1024x1024.png"
+     alt="Visual representation of conspiracy belief patterns"
+     style="object-fit:contain;background:#fff;">
+<p class="media-caption">Visualization of conspiracy belief patterns. Source: Substack</p>
+      </div>
+
+      <!-- GRAPH — updated to ResearchGate partisan conspiracy chart -->
+      <div class="media-item-img">
+        <div class="media-label-bar">
+          <span>📊 Graph</span>
+        </div>
+        <img src="https://www.researchgate.net/profile/Casey-Klofstad-2/publication/290474440/figure/fig3/AS:582373123526656@1515859980408/Belief-in-liberal-and-conservative-conspiracy-theories-by-partisan-identification-95.png"
+             alt="Belief in liberal and conservative conspiracy theories by partisan identification"
+             style="object-fit:contain;background:#fff;">
+        <p class="media-caption">Source: Uscinski et al. — Belief in liberal and conservative conspiracy theories by partisan identification (95% confidence intervals). Political Research Quarterly, 2016.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SOCIAL MEDIA & SPREAD -->
+<section id="social">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">08 — Social Media &amp; Spread</span>
+      <h2 class="section-title">How Conspiracy Theories Spread</h2>
+    </div>
+    <div class="fade-in" style="transition-delay:0.1s">
+      <p class="body-text">Conspiracies have transformed with the advent of social media platforms. Conspiracies, which previously took months or even years to propagate, are now spread throughout the globe within a matter of hours. The algorithms on these social media platforms are biased towards content with higher interaction rates, and conspiracy theories are designed to generate emotional responses from the audience. This forms a vicious circle, whereby the more interactions, the higher visibility.</p>
+    </div>
+    <div class="flow-diagram fade-in" style="transition-delay:0.2s">
+      <div class="flow-node">
+        <p class="flow-node-label">Origin Point</p>
+        <p class="flow-node-sub">Fringe forum post, blog, or YouTube video</p>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <p class="flow-node-label">Platform Amplification</p>
+        <p class="flow-node-sub">Algorithm recommends to broader audience based on engagement</p>
+      </div>
+      <div class="flow-arrow"></div>
+      <div class="flow-node">
+        <p class="flow-node-label">Mainstream Crossover</p>
+        <p class="flow-node-sub">Shared by influencers, picked up by news coverage</p>
+      </div>
+      <div class="flow-arrow"></div>
+    </div>
+    <div style="display:flex;justify-content:center" class="fade-in">
+      <div class="flow-fork">
+        <div class="flow-fork-node">
+          <div class="fork-icon">💬</div>
+          <p class="fork-label">Twitter / X</p>
+          <p class="fork-sub">Viral hashtags &amp; quote-tweets</p>
+        </div>
+        <div class="flow-fork-node">
+          <div class="fork-icon">📱</div>
+          <p class="fork-label">TikTok / Instagram</p>
+          <p class="fork-sub">Short video spreads to millions</p>
+        </div>
+        <div class="flow-fork-node">
+          <div class="fork-icon">🌐</div>
+          <p class="fork-label">WhatsApp / Telegram</p>
+          <p class="fork-sub">Private groups avoid moderation</p>
+        </div>
+      </div>
+    </div>
+    <div class="fade-in" style="margin-top:3rem">
+      <p class="body-text">Psychological and social variables also have their significance. When people are exposed to information only in agreement with their opinions, the echo chamber effect occurs, thereby intensifying distrust and reducing acceptance to correction. Alongside anonymity and speed of dissemination of information on social media, these psychological phenomena are responsible for the growing trend of conspiracies today.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CONCLUSION -->
+<section id="conclusion">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">09 — Conclusion</span>
+      <h2 class="section-title">Final Thoughts &amp; Open Questions</h2>
+    </div>
+    <div class="conclusion-split fade-in" style="transition-delay:0.1s">
+      <div>
+        <span class="label" style="color:var(--accent2)">Conclusion</span>
+        <p class="body-text"> Conspiracy theories are not made up haphazardly but thoughtfully constructed through fear, biases, and selective pieces of information. As indicated by this essay's three arguments, conspiracy theories are dependent on institutional distrust, blend facts with fake news to seem plausible, and flourish due to the nature of social media that favors interaction over verification. Even though some people may be skeptical of the theories, they continue posing risks to contemporary societies.</p>
+        <p class="body-text" style="margin-bottom:0"> Solving this problem is not as simple as regulating these platforms. There must be an investment made into educating people on how to think critically and understand the difference between reality and fiction.</p>
+      </div>
+      <div>
+        <span class="label" style="color:var(--accent2)">Future Research Questions</span>
+        <ul class="future-list">
+          <li>How do algorithmic recommendation systems differ in their amplification of conspiracy content across platforms like TikTok, YouTube, and Facebook?</li>
+          <li>What long-term effects does early exposure to conspiracy theories have on adolescents' critical thinking and civic engagement?</li>
+          <li>Can media literacy education meaningfully reduce susceptibility to conspiracy theories, and at what age is intervention most effective?</li>
+          <li>How should governments and platforms balance free speech protections with the need to limit dangerous misinformation?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WORKS CITED -->
+<section id="works-cited">
+  <div class="container">
+    <div class="fade-in">
+      <span class="label">10 — Works Cited</span>
+      <h2 class="section-title">Works Cited</h2>
+      <p style="color:var(--muted);font-family:var(--mono);font-size:12px;margin-bottom:3rem;letter-spacing:0.05em">MLA 9th Edition Format</p>
+    </div>
+    <ol class="works-cited-list fade-in" style="transition-delay:0.1s">
+      <li>
+        Jolley, Daniel, Karen M. Douglas, and Robbie M. Sutton. "Blaming a Few Bad Apples to Save a Threatened Barrel: The System-Justifying Function of Conspiracy Theories." <em>Political Psychology</em>, vol. 39, no. 2, April 2018, pp. 465–478.
+        <p class="citation-meta">JSTOR, www.jstor.org/stable/45094751. Accessed 5 March 2026.</p>
+      </li>
+      <li>
+        Uscinski, Joseph E., et al. "What Drives Conspiratorial Beliefs? The Role of Informational Cues and Predispositions." <em>Political Research Quarterly</em>, vol. 69, no. 1, March 2016, pp. 57–71.
+        <p class="citation-meta">JSTOR, www.jstor.org/stable/44018529. Accessed 30 March 2026.</p>
+      </li>
+      <li>
+        Thomas, Elise, and Albert Zhang. <em>ID2020, Bill Gates and the Mark of the Beast: How Covid-19 Catalyses Existing Online Conspiracy Movements</em>. Australian Strategic Policy Institute, June 2020.
+        <p class="citation-meta">JSTOR, www.jstor.org/stable/resrep25082. Accessed 30 March 2026.</p>
+      </li>
+      <li>
+        Miller, Joanne M., et al. "Conspiracy Endorsement as Motivated Reasoning: The Moderating Roles of Political Knowledge and Trust." <em>American Journal of Political Science</em>, vol. 60, no. 4, October 2016, pp. 824–844.
+        <p class="citation-meta">JSTOR, www.jstor.org/stable/24877458. Accessed 30 March 2026.</p>
+      </li>
+      <li>
+        Trinity College. "The Trinity Tripod 2025-03-04." <em>Tripod</em>, vol. 123, no. 12, March 2025. Trinity College Digital Repository.
+        <p class="citation-meta">JSTOR, www.jstor.org/stable/community.39215019. Accessed 30 March 2026.</p>
+      </li>
+      <li>
+        "People Drawn to Conspiracy Theories Share a Cluster of Psychological Features." <em>Scientific American</em>.
+        <p class="citation-meta">www.scientificamerican.com/article/people-drawn-to-conspiracy-theories-share-a-cluster-of-psychological-features/. Accessed 26 March 2026.</p>
+      </li>
+      <li>
+        "Invented Truths: The Historical Roots of Pseudoscience and Conspiracy Thinking." <em>Brewminate</em>.
+        <p class="citation-meta">brewminate.com/invented-truths-the-historical-roots-of-pseudoscience-and-conspiracy-thinking/. Accessed 26 March 2026.</p>
+      </li>
+      <li>
+        "What Do We Really Know About Social Media and Conspiracy Theories?" <em>Penn State News Literacy</em>.
+        <p class="citation-meta">newsliteracy.psu.edu/news/what-do-we-really-know-about-social-media-and-conspiracy-theories/. Accessed 26 March 2026.</p>
+      </li>
+      <li>
+        "Why We Fall for Conspiracy Theories." <em>Psych at Work</em>.
+        <p class="citation-meta">psychatwork.substack.com/p/why-we-fall-for-conspiracy-theories/. Accessed 26 March 2026.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  <p>Drashti Salunia · College Writing · Ms. Kays · April 17, 2026</p>
+  <p style="color:var(--accent);opacity:0.6">THE ARCHITECTURE OF DOUBT</p>
+</footer>
+
+<script>
+const progress = document.getElementById('progress');
+window.addEventListener('scroll', () => {
+  const s = document.documentElement.scrollTop;
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  progress.style.width = (s / h * 100) + '%';
+});
+
+const fadeEls = document.querySelectorAll('.fade-in');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+fadeEls.forEach(el => obs.observe(el));
+
+function toggleAccordion(header) {
+  const item = header.parentElement;
+  const isOpen = item.classList.contains('open');
+  document.querySelectorAll('.accordion-item.open').forEach(el => el.classList.remove('open'));
+  if (!isOpen) item.classList.add('open');
+}
+
+(function() {
+  const canvas = document.getElementById('particles-canvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, particles;
+  function resize() { w = canvas.width = canvas.offsetWidth; h = canvas.height = canvas.offsetHeight; }
+  function rp() {
+    return {
+      x: Math.random()*w, y: Math.random()*h,
+      vx: (Math.random()-0.5)*0.25, vy: (Math.random()-0.5)*0.25,
+      r: Math.random()*1.2+0.3,
+      hue: Math.random() > 0.6 ? 220 : 260,
+      a: Math.random()*0.35+0.08
+    };
+  }
+  function init() { resize(); particles = Array.from({length:70}, rp); }
+  function draw() {
+    ctx.clearRect(0,0,w,h);
+    particles.forEach(p => {
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=w; if(p.x>w)p.x=0; if(p.y<0)p.y=h; if(p.y>h)p.y=0;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`hsla(${p.hue},80%,70%,${p.a})`; ctx.fill();
+    });
+    for(let i=0;i<particles.length;i++) for(let j=i+1;j<particles.length;j++) {
+      const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y, d=Math.sqrt(dx*dx+dy*dy);
+      if(d<90) {
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x,particles[i].y);
+        ctx.lineTo(particles[j].x,particles[j].y);
+        ctx.strokeStyle=`hsla(220,70%,65%,${0.07*(1-d/90)})`;
+        ctx.lineWidth=0.5; ctx.stroke();
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  init(); draw();
+  window.addEventListener('resize', init);
+})();
+
+window.addEventListener('scroll', () => {
+  const hc = document.querySelector('.hero-content');
+  if (!hc) return;
+  const s = window.pageYOffset;
+  if (s < window.innerHeight) {
+    hc.style.transform = `translateY(${s*0.25}px)`;
+    hc.style.opacity = 1 - s / (window.innerHeight * 0.8);
+  }
+});
+
+if (window.matchMedia('(pointer:fine)').matches) {
+  const g = document.createElement('div');
+  g.style.cssText = 'position:fixed;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(123,167,255,0.05) 0%,transparent 70%);pointer-events:none;z-index:9998;transform:translate(-50%,-50%)';
+  document.body.appendChild(g);
+  document.addEventListener('mousemove', e => { g.style.left=e.clientX+'px'; g.style.top=e.clientY+'px'; });
+}
+</script>
+</body>
+</html>
